@@ -1,0 +1,56 @@
+﻿@page "/"
+@implements IDisposable
+@inject ICameraPollingService Poller
+
+<h2>Camera Grid</h2>
+
+<div class="grid">
+    @for (int i = 0; i < 16; i++)
+    {
+        var cam = i < _order.Count ? _order[i] : null;
+        <div class="tile">
+            @if (cam is not null && _images.TryGetValue(cam, out var url))
+            {
+                <img src="@url" alt="@cam" />
+                <div class="label">@cam</div>
+            }
+            else if (cam is not null)
+            {
+                <img src="@_placeholder" alt="@cam" />
+                <div class="label">@cam</div>
+            }
+            else
+            {
+                <div class="empty">Empty</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private readonly Dictionary<string, string> _images = new();
+    private readonly List<string> _order = new();
+    private string _placeholder =
+        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnPjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbGw9JyMwMDAwMDAnLz48L3N2Zz4=";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Poller.ImageUpdated += OnImageUpdated;
+        await Poller.StartAsync();
+    }
+
+    private void OnImageUpdated(object? sender, ImageUpdatedEventArgs e)
+    {
+        if (!_order.Contains(e.CameraName) && _order.Count < 16)
+            _order.Add(e.CameraName);
+
+        _images[e.CameraName] = e.DataUrl;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Poller.ImageUpdated -= OnImageUpdated;
+        Poller.Stop();
+    }
+}
